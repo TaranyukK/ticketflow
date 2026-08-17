@@ -17,24 +17,27 @@ TicketFlow — высоконагруженный сервис брониров�
 Гибридная архитектура: Rails (full-stack) + Go микросервисы.
 Решает три проблемы: overbooking, zombie reservations, thundering herd.
 Pet-проект для демонстрации перехода от Rails к Go и навыков Senior Engineer.
+GitHub: https://github.com/TaranyukK/ticketflow
 
 ## Текущий этап
-README.md готов с актуальными версиями. docker-compose.yml готов.
-Следующий шаг — инициализация приложений (создание структуры директорий, `rails new`, `go mod init`).
+Приложения инициализированы (Rails 8.1 + 3 Go-сервиса на Go 1.26).
+Makefile готов с целями: help, up, down, setup, migrate, migrate-all, run-*, test, lint.
+Go модули: github.com/TaranyukK/ticketflow/services/{booking,waiting-room,payment}.
+Следующий шаг — gRPC контракты (начинаем с Booking Service).
 
 ## Архитектура
 
 ### Компоненты
 | Компонент | Стек | Ответственность |
 |---|---|---|
-| **TicketFlow Web** | Rails 8.1+ (full-stack, Hotwire, Slim) | Фронтенд, CRUD мероприятий, пользователи, админка (Avo), отчёты |
+| **TicketFlow Web** | Rails 8.1+ (full-stack, Hotwire, Slim, Solid *) | Фронтенд, CRUD мероприятий, пользователи, админка (Avo), отчёты |
 | **Booking Service** | Go 1.26+ | Атомарное бронирование, overbooking protection, zombie cleanup воркер |
 | **Waiting Room Service** | Go 1.26+ | Rate limiting, очередь, backpressure, WebSocket для статуса |
 | **Payment Service** | Go 1.26+ | Асинхронная обработка платежей через Kafka, webhook-и от Stripe |
 
 ### Инфраструктура
 - **PostgreSQL 16** (shared DB, separate schemas: `public`, `booking`, `waiting_room`, `payment`)
-- **Redis 7.2** (rate limiting, waiting room, Sidekiq для Rails)
+- **Redis 7.2** (rate limiting, waiting room — только для Go-сервисов)
 - **Kafka 3.7** с KRaft mode (event bus между сервисами, без Zookeeper)
 - **Kafka UI** для отладки событий
 
@@ -46,32 +49,33 @@ README.md готов с актуальными версиями. docker-compose.
 ### Структура mono-repo
 ticketflow/
 ├── README.md
+├── CONTEXT.md
 ├── docker-compose.yml
 ├── Makefile
 ├── .env
 ├── .gitignore
-├── web/ # Rails 8
+├── web/ # Rails 8.1
 │ ├── app/
 │ ├── config/
 │ ├── db/
 │ ├── Gemfile
 │ └── Dockerfile
 ├── services/
-│ ├── booking/ # Go
+│ ├── booking/ # Go 1.26
 │ │ ├── cmd/
-│ │ ├── internal/
+│ │ ├── internal/{domain,service,repository,handler}/
 │ │ ├── proto/
 │ │ ├── go.mod
 │ │ └── Dockerfile
-│ ├── waiting-room/ # Go
+│ ├── waiting-room/ # Go 1.26
 │ │ ├── cmd/
-│ │ ├── internal/
+│ │ ├── internal/{domain,service,repository,handler}/
 │ │ ├── proto/
 │ │ ├── go.mod
 │ │ └── Dockerfile
-│ └── payment/ # Go
+│ └── payment/ # Go 1.26
 │ ├── cmd/
-│ ├── internal/
+│ ├── internal/{domain,service,repository,handler}/
 │ ├── proto/
 │ ├── go.mod
 │ └── Dockerfile
@@ -84,11 +88,12 @@ ticketflow/
 ├── prometheus/
 └── grafana/
 
+
 ## Rails стек
 - Rails 8.1+ (full-stack, Hotwire/Turbo)
 - Slim (шаблонизатор views)
 - PostgreSQL (shared DB, schema `public`)
-- Redis + Sidekiq (фоновые задачи)
+- Solid Queue / Solid Cache / Solid Cable (фоновые задачи, кэш, ActionCable в PG)
 - Devise + JWT (аутентификация)
 - Avo (админка)
 - Ransack (поиск/фильтрация)
@@ -129,6 +134,8 @@ ticketflow/
 **Credentials**: через .env файл (в .gitignore)
 **Volumes**: PostgreSQL, Redis, Kafka сохраняют данные между перезапусками
 **Kafka KRaft mode**: без Zookeeper, современный стандарт
+**Solid * в Rails 8**: Solid Queue/Cache/Cable вместо Redis+Sidekiq, всё в PostgreSQL
+**Makefile**: с целью `help`, `.PHONY` для всех целей, `migrate-all` для Rails + Go
 
 ## Схема БД (PostgreSQL)
 
@@ -177,9 +184,9 @@ ticketflow/
 ## README.md статус
 ✅ Описание проекта и ключевые технические вызовы
 ✅ Архитектура и компоненты
-✅ Стек технологий с обоснованием (включая Slim)
-✅ Локальный запуск
+✅ Стек технологий с обоснованием (включая Slim и Solid *)
+✅ Локальный запуск (через Makefile)
 ✅ API и сценарии использования
 ✅ Структура репозитория
-✅ Roadmap
+✅ Roadmap (с отмеченными выполненными пунктами)
 ✅ Требования к локальной среде

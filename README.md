@@ -14,7 +14,7 @@
 
 | Компонент | Стек | Ответственность |
 |---|---|---|
-| **TicketFlow Web** | Rails 8.1+ (full-stack, Hotwire, Slim) | Фронтенд, CRUD мероприятий, пользователи, админка (Avo), отчёты |
+| **TicketFlow Web** | Rails 8.1+ (full-stack, Hotwire, Slim, Solid *) | Фронтенд, CRUD мероприятий, пользователи, админка (Avo), отчёты |
 | **Waiting Room Service** | Go 1.26+ | Rate limiting, очередь, backpressure, WebSocket для статуса |
 | **Booking Service** | Go 1.26+ | Атомарное бронирование, overbooking protection, zombie cleanup |
 | **Payment Service** | Go 1.26+ | Асинхронная обработка платежей через Kafka, webhook-и от Stripe |
@@ -32,11 +32,11 @@
 
 | Технология | Назначение | Почему выбрана |
 |---|---|---|
-| Rails 8.1+ | Основной фреймворк | Быстрая разработка CRUD, админки, отчётов |
+| Rails 8.1+ | Основной фреймворк | Быстрая разработка, современные дефолты |
 | Hotwire/Turbo | Интерактивность | Современный UX без React, server-driven rendering |
 | Slim | Шаблонизатор views | Чище ERB, быстрее Haml, отлично работает с Hotwire |
 | PostgreSQL | Персистентность (schema `public`) | Надёжность, транзакции, JSONB |
-| Redis + Sidekiq | Фоновые задачи | Рассылки, отчёты, кэш |
+| Solid Queue / Cache / Cable | Фоновые задачи, кэш, WebSockets | Rails 8 дефолт: всё в PostgreSQL, меньше зависимостей |
 | Devise + JWT | Аутентификация | Стандарт индустрии, гибкость |
 | Avo | Админка | Современная, на Hotwire, быстро настраивается |
 | Ransack | Поиск/фильтрация | Декларативные фильтры без написания SQL |
@@ -50,7 +50,7 @@
 | Go 1.26+ | Микросервисы | Конкурентность (goroutines), низкая латентность |
 | gRPC + Protobuf | Rails ↔ Go коммуникация | Строгая типизация контрактов, бинарный протокол, быстрее REST |
 | PostgreSQL | Персистентность (per-service schemas) | Row-level locking, `FOR UPDATE SKIP LOCKED` |
-| Redis | Rate limiting, waiting room | Атомарные операции, TTL, streams |
+| Redis | Rate limiting, waiting room | Атомарные операции, TTL, streams (только для Go-сервисов) |
 | Kafka | Event bus | Backpressure, replay, аудит, decoupling сервисов |
 | Prometheus | Метрики | Стандарт observability, интеграция с Grafana |
 | OpenTelemetry | Трейсинг | End-to-end tracing через Rails + Go + Kafka |
@@ -60,10 +60,10 @@
 | Технология | Назначение |
 |---|---|
 | PostgreSQL 16 | Основная БД (shared DB, separate schemas) |
-| Redis 7.2 | Кэш, rate limiting, Sidekiq backend |
+| Redis 7.2 | Rate limiting, waiting room (только для Go-сервисов) |
 | Kafka 3.7 (KRaft) | Event bus без Zookeeper |
 | Docker Compose | Локальная разработка |
-| Makefile | Автоматизация (up, down, migrate, test) |
+| Makefile | Автоматизация (up, down, migrate, test, help) |
 | golang-migrate | Миграции БД per schema |
 | Kafka UI | Отладка событий |
 | Prometheus + Grafana | Мониторинг |
@@ -113,19 +113,25 @@ Kafka для асинхронной обработки платежей, ауд�
 git clone https://github.com/TaranyukK/ticketflow.git
 cd ticketflow
 
+# Список доступных команд
+make help
+
 # Поднять всю инфраструктуру
 make up
+
+# Установить зависимости
+make setup
 
 # Инициализировать БД
 make migrate
 
 # Запустить Rails
-cd web && bin/rails server
+make run-rails
 
 # Запустить Go-сервисы (в отдельных терминалах)
-cd services/booking && go run cmd/main.go
-cd services/waiting-room && go run cmd/main.go
-cd services/payment && go run cmd/main.go
+make run-booking
+make run-waiting-room
+make run-payment
 ```
 
 Открыть:
@@ -157,19 +163,21 @@ cd services/payment && go run cmd/main.go
 ```
 ticketflow/
 ├── README.md
+├── CONTEXT.md
 ├── docker-compose.yml
 ├── Makefile
 ├── .env
 ├── .gitignore
-├── web/                          # Rails 8
+├── web/                          # Rails 8.1
 ├── services/
-│   ├── booking/                  # Go
-│   ├── waiting-room/             # Go
-│   └── payment/                  # Go
+│   ├── booking/                  # Go 1.26
+│   ├── waiting-room/             # Go 1.26
+│   └── payment/                  # Go 1.26
 ├── proto/                        # Общие gRPC контракты
 ├── migrations/                   # Миграции БД per schema
 └── infra/
     ├── postgres/
+    │   └── init.sql
     ├── kafka/
     ├── prometheus/
     └── grafana/
@@ -177,10 +185,12 @@ ticketflow/
 
 ## Roadmap
 
-- [ ] Docker Compose с полной инфраструктурой
-- [ ] Инициализация Rails приложения
-- [ ] Инициализация Go-сервисов
+- [x] Docker Compose с полной инфраструктурой
+- [x] Инициализация Rails приложения
+- [x] Инициализация Go-сервисов
+- [x] Makefile с help и автоматизацией
 - [ ] gRPC контракты между Rails и Go
+- [ ] Миграции БД для Go-сервисов (golang-migrate)
 - [ ] Kafka топики и consumers
 - [ ] Prometheus + Grafana дашборды
 - [ ] OpenTelemetry tracing
