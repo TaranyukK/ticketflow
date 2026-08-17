@@ -1,0 +1,14 @@
+.env
+web/tmp
+web/log
+web/node_modules
+web/public/assets
+web/public/packs
+services/*/vendor
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.DS_Store
